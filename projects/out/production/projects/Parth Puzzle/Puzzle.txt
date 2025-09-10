@@ -1,0 +1,214 @@
+import javax.imageio.ImageIO;
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Array;
+import java.util.ArrayList;
+import java.util.Objects;
+
+// Author - Parth Zanwar
+// Class - Computer Science 2 K
+// Project - Sliding tiles
+// Description - This is a fun game where you slide around the tiles in order to complete the image
+public class Puzzle extends JFrame {
+
+    private int size = 2; // Default size
+    private int whiteI; // the white square row number
+    private int whiteJ; // the white square column number
+
+    private BufferedImage image = null; // the current image
+    private String filename = "Sreeshan.jpg"; // the name of the image file
+    private JPanel sliderPanel; // the panel in which the tiles are held
+    private JPanel topPanel; // The top Panel which holds the options to change the size and the image
+    private JButton[][] userGrid; // The grid of buttons displayed to the user
+    private int[][] referenceOrder; // Order of which original image was generated in
+    private int[][] userOrder; // Order of the current grid
+    private JComboBox<String> sizeSelector; // Combo Box to select a size
+    private JComboBox<String> imageSelector; // Combo Box to Select an image
+    private JButton scramble; // Button to scramble the puzzle again
+
+    // Constructor to set up the game frame
+    public Puzzle() {
+        try {
+            image = ImageIO.read(new File(filename));
+            initGUI();
+            setTitle("Slider Game");
+            setVisible(true);
+            setResizable(false);
+            setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            setLocationRelativeTo(null);
+            pack();
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this, "The image file " + filename + " could not be opened");
+        }
+    }
+
+    public static void main(String[] args) {
+        EventQueue.invokeLater(Puzzle::new);
+    }
+
+    // Method that calls other methods to set up the game
+    private void initGUI() throws IOException {
+        // Set up layout
+        getContentPane().setLayout(new BorderLayout());
+        image = ImageIO.read(new File(filename));
+
+        // Create the top panel
+        createTopPanel();
+        getContentPane().add(topPanel, BorderLayout.NORTH);
+
+        // Create the scramble button
+        scramble = new JButton("SCRAMBLE!!!");
+        createScrambleButton();
+        getContentPane().add(scramble, BorderLayout.SOUTH);
+
+        // Initialize the slider panel
+        sliderPanel = new JPanel();
+        createSliderPanels();
+        getContentPane().add(sliderPanel, BorderLayout.CENTER);
+
+
+    }
+
+    // Method to create slider Panels
+    private void createSliderPanels() throws IOException {
+        // Clear the previous panel
+        sliderPanel.removeAll();
+
+        // Set up grid layout for the new size
+        sliderPanel.setLayout(new GridLayout(size, size));
+
+        // Calculate the tile size based on the smaller dimension of the image
+        int sideSize = Math.min(image.getWidth(), image.getHeight());
+        int tileSize = sideSize / size;
+
+        // Initializes grids with respective objects
+        userGrid = new JButton[size][size];
+        referenceOrder = new int[size][size];
+        userOrder = new int[size][size];
+
+        // counter increments in each iteration to help determine the proper placement for the win condition
+        int counter = 0;
+
+        // Populate the grid with buttons and images
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                BufferedImage subImage;
+                if (i == size - 1 && j == size - 1) {
+                    // Create a blank sub-image for the white space
+                    subImage = new BufferedImage(tileSize, tileSize, BufferedImage.TYPE_INT_ARGB);
+                    whiteI = i;
+                    whiteJ = j;
+                } else {
+                    // Extract sub-image for the current grid cell
+                    subImage = image.getSubimage(j * tileSize, i * tileSize, tileSize, tileSize);
+                }
+
+                // Puts the respective button into the grid
+                userGrid[i][j] = new JButton(new ImageIcon(subImage));
+                userGrid[i][j].setFocusPainted(false);
+                userGrid[i][j].setBorder(null);
+
+                // Adds an action listener to the button in the matrix
+                int finalI = i;
+                int finalJ = j;
+                userGrid[i][j].addActionListener(ae -> {
+                    try {
+                        buttonClicked(finalI, finalJ);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+                sliderPanel.add(userGrid[i][j]);
+
+                // Puts the location of the variable in the integer matrices
+                referenceOrder[i][j] = counter;
+                userOrder[i][j] = counter++;
+            }
+        }
+
+        // Calls other methods to set up the game
+        randomizeSlides();
+        revalidate();
+        repaint();
+    }
+
+    // Action listener for each button in the matrix
+    private void buttonClicked(int row, int col) throws IOException {
+        // Check if the clicked button is adjacent to the white space
+        if ((Math.abs(row - whiteI) == 1 && col == whiteJ) || (Math.abs(col - whiteJ) == 1 && row == whiteI)) {
+            swap(row, col, whiteI, whiteJ, true); // swaps tiles if true
+        }
+    }
+
+    private boolean inBounds(int row, int column) {
+        return row >= 0 && row < size && column >= 0 && column < size;
+    }
+
+    // Swap method to swap tiles to new location
+    private void swap(int fromRow, int fromCol, int toRow, int toCol, boolean checkWin) throws IOException {
+        // Swap icons between the buttons
+        Icon temp = userGrid[fromRow][fromCol].getIcon();
+        userGrid[fromRow][fromCol].setIcon(userGrid[toRow][toCol].getIcon());
+        userGrid[toRow][toCol].setIcon(temp);
+
+        //Swap the numbers
+        int holder = userOrder[fromRow][fromCol];
+        userOrder[fromRow][fromCol] = userOrder[toRow][toCol];
+        userOrder[toRow][toCol] = holder;
+
+        // Update the white space position
+        whiteI = fromRow;
+        whiteJ = fromCol;
+
+        // Checks if method should check win
+        if (checkWin) {
+            if (win()) { // checks if win condition is met
+                // Slots in missing piece
+                userGrid[size - 1][size - 1].setIcon((new ImageIcon((image.getSubimage((size - 1) * Math.min(image.getHeight(), image.getWidth()) / size, (size - 1) * Math.min(image.getHeight(), image.getWidth()) / size, Math.min(image.getHeight(), image.getWidth()) / size, Math.min(image.getHeight(), image.getWidth()) / size)))));
+                // Repaints the slides
+                repaint();
+                // Displays message on the screen
+                JOptionPane.showMessageDialog(null, "YOU WIN!");
+                int response = JOptionPane.showConfirmDialog(null, "Play Again?", "Play Again?", JOptionPane.YES_NO_OPTION);
+                if (response == JOptionPane.YES_OPTION) {
+                    createSliderPanels();
+                } else if (response == JOptionPane.NO_OPTION) {
+                    dispose();
+                }
+            }
+        }
+    }
+
+
+
+    private void randomizeSlides() throws IOException {
+        // Number of random moves to make
+        int randomMoves = size * size * 10; // Arbitrarily chosen; adjust as needed
+
+        for (int i = 0; i < randomMoves; i++) {
+            // Get the valid neighbors of the white tile
+            ArrayList<int[]> neighbors = getAdjacentTiles(whiteI, whiteJ);
+
+            // Randomly pick one of the neighbors
+            int[] randomNeighbor = neighbors.get((int) (Math.random() * neighbors.size()));
+
+            // Swap the white tile with the selected neighbor
+            swap(randomNeighbor[0], randomNeighbor[1], whiteI, whiteJ, false);
+
+            // Update the white tile's position
+            whiÀõ$Ôg8®z»4wMŸ'üB“Oµø™¯\•’°Ò¥²e‡bÏªí#†ÇÏ™‹&ãÓ;b¸xÒ1á”‡Šáe1ÛÌ¯d2Ü|ÙÚC1Œm+ÎÜîÀ öÿ µËc®jmÜ‘Ûiº$—ªct—1^ÜÈ Å1T‰å`ªÁÃäª‚|›TÕ§Õ¡Õ¢‹OXo™'‡&)Õœ»ÊAÜ¤…)A!‰9ÜJ7ĞQ¦¤ÔšÒËòF““PåO]6sô’êZjÌ¯–±Hñ„ÈVBAŒ²lpK6?Ã»›šuŒwíix¯,o5³y~[ºFcÂ§¤ìü¹Î?„gnK4ëØ¡šÚcûëD)+¤ĞoI®·àœ`H8z­iÄz\—qI·¾Ïo°ÅÁİâVä»¤|°'“÷IÍzê6Š8U¹¯#_RÖ›N³´hã’9%+,­˜U@à:wp1ÏPXw¬}OÄ´ûí«hè±¬rª"ÌˆÍ´ä©%†dMÙÁÇnj¬ºô¬³ ¶÷÷”¬ß79i%HlÏİì6œE±Y-&·*÷:§ü»Cn[ÌÆÆÂ0Sˆr8¥
+I|Hs¨şÉ{YÕ'Õ4ÁfóM·dr%¼òoW!8Ú¨Øùºe±Éyum4Ö¶)5´+:ÚÚÚîmÌ	‰L›ó)¨h ;ãŒNÆÌÉåÃ|Èy‡8aÇß'”zŒ@©-¡êì>ÎX3	€eG…tİ‘€Pœõº5v$£¢8ÛrÔ×ğÎ—<z‹Z–šfºF3ÍH<¶÷ckbUhÏŞèwü­ıïvÓ<?o¤[‹;+û{«Ÿ4$Mk"„ºe„É’'îÄsË(`[nÑ•æBx^E¢™¬ã2Iu5ıƒÙ«G$Sâ±_º‡ 0áÀ`q]ü i&¡ûIã„ğÇæ|9óHä|¡ãî›ˆİ¹«ÆÅT”Ùêaé¨¢ö­¨‹m.âÒşÜYÙ®Ë¨n•Å« *Òp_xÜ»AÃ)È`+š·¾›TµHç3O‹ß`b’l+ó"Èà3`– àŒŒN•âÎ³Ío=üwV×8yeÙ#)ó p	G8ãÇİxš¶Kh×8¶Ãm çØXØíùË*cƒ½°AëÍNVGLågvcŞXÃ`·6tòjÖ—QïŠ)Ä"Y€Ú¦LıçL+tS¼­Y:_îlmîâf/î>b f?)ÊªVER <ƒ~ŞòUºñÀÉË€¶÷#YS2Æ7Ê‚6³{'×Mi´İB8äˆYb2¨ˆynrC¿º''¡ úÑÚÍt·ĞÓÕ£:„Ë‚áZ?-&šAˆ”31Ë)ù 0€ÀP âºÃk%ŸöŒñâkµiLÇ|dã'–\±àò3ï\´úµ¶“ys%­³-ä­ˆfy‡‘—û£~wç» ÛOt×lz2BÒÌ–‚pFÒ,Ï¸+	R<Á‚ÿ 1ÎFzc—²F´ìÛg7¬B–pI ’0’6à®	hÿ ÙÏ¾{ñ\Ö –—¶M-ô &LqÇ*îJ«Óƒc¿qÛuhxƒuÄÉmqó\mş\¤l$Bá€<‚£ c©Ï:Ãµ½¼³¼ĞˆÄi´ˆ%|?— ,$¢²çi ;àôR‹Sš«ÔÖÒî&¹¸šy$2M2äDû‘£á—““´z{uZ–ÖkË…MÖQ§¾Ğæ-ìXàUà|İIöïSYéóÁ§À¯!Šk½Î-ä‘#”!û€q´£ ¹\cŒšrÈ.¬î#ûrF²r¤ —ÌVêy!õ7»ĞÑ+-G^\D’	V[k¦3G$ÍhÈ0W8Uls´¼g®FqÚ¡I’~Ëo}œ²@±‰GP¤d`È.=şF¥²±1Ø‰ÒÖÖUP$#td¥†~RH<}+AüØì&¶39QJƒ‚’U÷ˆõM¥ Y½Lù+ØŞ<"Âß#,ŒT >èÀ1LÍ¾2¢	1íbÌr¸bÙïÇÿ Kk´2Â‘©]¬b¨àtê¸«¿fÖCËrÛä‘‡9 ƒ˜ëíŠ.’'—˜…U®?p¥wHÛU¤PÉÂ³`d`Ïcš.¬ÛRR®ª4ÊŞ\ ÚFÓÆOlc¾ôÙ¤Šmñá%yÈÁÎC¨å³ßÎ}« Ğü?k©Íõ[¥••”‚Å€ùr¤ŠAÇ=Ïñ„ê*k™T¨ºÚ#›¾Ñ¾Õ1¸Ø×[f
+×M)ó×	€»OQ†_ûê¶dU“I²˜JY´ö'UÛ™-Dbz”İÁÁü1]4²†Æíík‰ÍÔ>]Âü¦?˜óâ
+[=şéäõªú¶¶·Eš[[Ó÷ĞóC¸\¶sıñ\ÿ ZS²GKÁ8]³”Õ¬dŒMu2ùÊ±ìÈÑ*ãjqÎrã'9öÀ¥5œ‘ÜHIşt±+H4.¹<ä|˜úâº«k}4Hßl|¼`Îve3†Îî€YÑÚÅ¦[ñ¸g’9.ãvæ7W}¾WÈ2£wÊO9ÜsØôF£±Ë*:”líäiÏÙÈ72ÃùdLcêM-ŒcÉˆGºh·™c;_“È?\œ{ûÑ}«>›y»å:àngÇîØ’£vs´õÏN‚W“ì÷me“–¹6än*Hç<çµ¥İ®eÊ®WOË¸ù‘Gş¶á£?¼e6„Hÿ VqÒÓìím—Äáã–xdÂÌ…·ltõ .=ó][ÉyŠŒ¨r#Q’à>{g'¯¥fÇfV8›Ë‡k1‰$X±`0…[ˆëÔğsUb•-6O2g“l&I	Hü»†+Œïü^=«>iáµ‚Ö%p¶»\¤QT“·¿;¹÷« JO›s°*;N¹ùNâ8¨$–k…"	?x!fI%ŒÌ ô'±5¬Ld…C$vpMI#0+^W—;)$y‹:îÜ8;qœ[¸ö¤³¬ëÎ÷`UÜ7ÊF;F11¸ä•·}xu÷nİÚY&•UŒ†#kç ng;G_,ËÇ›NÂ, ´s:ÛÇŸ•ÜTä6>lmœw7pj¢Ìä»Dy(‘˜m¬rëö_ŞË#*íó	ÎÒ2½ºn5-š›U¸¾BÑÀø€"›yç*„søá©É9¸{¸[””Z7›oH›Nq³ç^	9ü)¶öíû›;kaĞ»|Í·J¯ îsıáA(¾ÌTöi-“ï:…$Æ8QÈ9ñÍ57[ÇÌÒÈáÿ Õ•fgb3×8÷èqQÍ¨¶´Xof·X`d>tjòÌËÀË·İëÛ¶*x!XîD,¢`¡¥eÃ62¯Ûœô©±z¿´!†EIœÆÌ0rrOFãÏ8æ•c‚Ä•ˆ™rùÈ¸Î7üX<ûæ«$­nó%¥ªCk#2'•š;‡BJHÙû»w6LóŞË²Âi¼Ö„+JÌ¸IT¶>R:JğxÆ{â‹Éï. ¶³ŸÍlÆFÂv0–öõ¤·€Ü-´ávGrCFÌÈFİÅ‡#'o¿J"Õ-¬î gÒ{WÄÆ¾øËpNy¨µEşĞİcÜb•q–b¸==I g°µØ<ÆÛÍÙ×d4ª¾c¥ÉÈšRU¶¼mŒ’qƒ¹B’ßQıšàM<·+	šâ@%xOîÚ5o–Gğô<ñÎjåÅ˜¼¾-n¿g®âI™xŒFëï´pkçwj)£d­î£E6Òè!ÉÎç;~é>§r{Ó¸¬U˜y³Ï*(ÜÌ0²1_3 ü¬Ãs’	ãŒw«R^†—ËU†ßª*„ù†âNdõÇåU/¢’Eóù‰ 1ù‘Í·ĞûO¼sšdÓ,pÆ^FcùØöÈWnÏ\ÿ œÕZäŞÅ‹ûÉ!X¤)åCÜÅUPÜİ‰'>øïRD¡£‘•6,û\±*¸Ï;>ı3ÆqTV8ÿ µŠ”Y¤hÃ2NZÎ#s› €:÷ëVn•&¾–ÒŞ ‘ EkkwÌÆw(à`ÜäQä?2õ»(‰âEåİ8[ªÀc Œs´€Ùç¥@,æ‚	/.eÍ#°¸»f%$±ç,*@Îìcœi—Á%»8¶W2ynq·’	é´3}î>oLÒ>âÆŞÍ3æ@X´@³&H–?`Så#Ğú“RPø–Ñ®"³ºÓ£’)W",•ƒ;»²•$ş«öZ”ÒNßiù|‘'Û'·gL tˆ3Ÿ˜«qĞšÌKT¸XÚÒO*=ÅYãÊ 
+ÿ xr?ïª†ãOKehn„­<†‘”ÆÛŠ†Œgœ’ùSè}M;yŠşEÍ£MQ¾hŞUP©#)dŠ%ùw|Ü8˜¨>Õ¾ùY_æ×s,y#—o”ú‘èE/<Í*ùoqxÒ¤kn`"ßt"ìû€ŒñÓ4É´‰¡ÓY£2D!}±Á…VEsüOÛ–Ç€ô§§RuèIkv
+¼ñÅ “æÎŒè0zñóT’L¶Q»ÂMæ¤KÓó 8ã;@<sPİ+_Éqv’o)ŒÈ¯µ$eù\	Éç¸¨a$-£_Ç4§,Ñ\RGğç>´ípÔ¸°˜…Ã.å”°-æ`ù§'$íëQB·Û À­»’ÎÙ+‚
+c+ÏLdôİšádÔ!x k ±¨>PÌ—Û·N2I=³VdHâ’ãìGÈ°x]yÜo3«c8#ı‘Hešö)¬:l Ì¡‹4[‘¢
+œ3§Ú´äuDˆ:Lğ½Àæ0ÊÌ#ï:…ÜÜ3Õ—¼vváYËie‚DÚ9bAMÅLù@ÉØãš[{WµWcXœÄl%óÁI /~
+¾„šMöš8î®,c¶ÚÇ”Ì¾RíÜ>Õa‚ç8êO>ŒµŞÖªDsAçn•beù¤aÇ™“İT6àåªÜ#B'WŒ¢³40Ú`•uF÷pÃLG,’$™gWa™#Œ&1µdî©Îƒ¿Íf¶.Á$%'D¢I€HíÔ¾õçlû·83Çzls€î<‚ïÜ7Œ€:ş=¿­Aö9ã¹‰R/Ì£æg=úœsIÑÆIã°>d„ lúš»Ğ³¶ÊI?wÔ 9R§9'r¨Æzäã§Z[}=R"–3Ì1D	rÿ ÂçÁğsY¯Ìk¼J²Ü+‰|¼°”`ç‚Iäßå«&SqökÍ?Î·´–ID’Ü`JøaòpTpzç>ô[Ìò£[†¸…YÁ½|ò8À7r:/CÎ9Á¨`º>LW-À6ì0Î¹ö.ÜÇ,=IÀ$š'ŒË1!Hr§?)Èü:GHcÜŞ\ÃÁ!2»T|«ùb¨›iv,·¹»Ënx\:ä};ƒŸ½×7vÅoqµÈÒd;ö‚OÉ$Ö{éó]}‘ÊÆ!	HD<¶æÇ9Â?Şü¬É ŠVC:²H©=Æ<Ãœàÿ (Çæ)1¡dWİ=ÃNÊL!hÔ>ürW$Ó?ÇN’g?İÍ0Ü©æ§—y€ò ±èFO^?:ƒí›#$'d4¼àç¯CŠ›å·rƒ÷.X•2¶|ÑÜ©ïŠ¦„ÿ j»±TX®#ŒU>Î¾[zÆyíÁëŞ«X·ÛnV9çe0³1óœ2Î	éô=³WZ2¨Y~Ï¹O™…´äc#¨à{õéL¸W’%D¶WAÄlb7I'ë•ÃR´ÓÅ¤²?ú8r«¹FÑ^{ÿ ŸjÒYn´©ƒIæ]]Ãj³­±hâu°76ÒqµI qƒŞ³¶ÜÙïÔY„Æ™‡$0$nÂ äñÉô¦Ãk¶Í[ß%î¤ieP¥^Sœ† Ÿ™†áŞ\Ş[-<É¼ÇØbŠ/#b·÷ß¿ñÇøAô¥…d|F–ŒÒd+2í
+@$ó×9õ5š°hmHm¼¡2îyŠ¨+È
+XzsŒ{ıjì‹Ø¹³+¸d>Pê%ÑÙAèZ›%2Xnw6”ÒZ).Z8åN7y›0Àœa²O~xûÔ‘«,	ò"™Ù¼Ì†*Ø'ÛøGN{æ¡\à­¬Af3`ª.Ş£œñØ’{Ô²#Ûı‰„!àÊ ÌªÙî[®}½½è–ôõv–D[xãµåÆä†‘wÏL+¦ì÷§C<r<e~H¤VgHe#îŒtÀçóªËÍ#—˜[Ç óBÊì8QÏn:ãŒTî¦êI6Â¨nxòXeÁÎ@|Ã“ƒµsE-	•pSÏHælù¯²³€~½~µsF¾·³³Óä’úÖÎıdi-×™œa|¦yòÚ2GÍò•=Mcß§—ËhØ/™t/ g dğN1ŠˆİL¶îÂf·šè¨o)Â³’®FyU$coOÆ—'2dÏ@›Älx‚ "
+A\¹EÏA»¦8É#¨£P–Íã»ÚD¼Wq#Æ®F%Ú1R§Œ8¯=Yæk„¥ˆ$iÊ ¼“ƒÇ çˆ«V¼rH»€·@s‘p99

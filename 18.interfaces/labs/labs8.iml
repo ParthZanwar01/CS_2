@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="JAVA_MODULE" version="4">
+  <component name="NewModuleRootManager" inherit-compiler-output="true">
+    <exclude-output />
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/1.interfaces_Monster_lab1_java_aplus" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/2.interfaces_Monster_lab2_java_aplus" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/3.interfaces_RomanNumeral_lab_java_aplus" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/4.interfaces_SortByLength_lab_java_aplus" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/5.interfaces_SortByVowels_lab_java_aplus" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/6.interfaces_Rational_lab_java_aplus" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/7.interfaces_SortByAge" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/8.interfaces_WebsiteSorter" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/9.interfaces_Comparator" isTestSource="false" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>

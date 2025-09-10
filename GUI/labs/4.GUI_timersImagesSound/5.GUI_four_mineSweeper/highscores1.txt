@@ -1,0 +1,20 @@
+Bryce
+18
+turing
+23
+too slow
+25
+again?
+25
+Dijkstra
+27
+travis
+28
+what??
+33
+Bryce Hulett
+35
+A*
+37
+micah
+37

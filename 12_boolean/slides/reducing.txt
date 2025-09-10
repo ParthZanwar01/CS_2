@@ -1,0 +1,5 @@
+(cs)’(c+s) -> apply DeMorgan’s Law
+(c’+ s’)(c+s)-> Distribute
+(c’+s’)(c) + (c’+s’)(s)-> Distribute again
+c’c + s’c  + c’s + s’s  -> simplify(c’c is always false)
+s’c + sc’

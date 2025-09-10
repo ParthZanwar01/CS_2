@@ -1,0 +1,705 @@
+// All required imports
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionListener;
+import java.awt.geom.Ellipse2D;
+import java.awt.geom.Line2D;
+import java.awt.geom.Rectangle2D;
+import java.util.ArrayList;
+import java.util.Random;
+
+/*
+Author : Parth Zanwar
+Date Worked On:  3/30/25 - 3/31/25
+Description: This is a fun RayMarching Lab Designed to Produce Rays that interact with Objects in the Environment
+ */
+
+interface Drawable {
+
+    void drawObject(Graphics2D g2D);
+}
+
+// Main Class,  Used to Create and Run the Lab, creates a frame with multiple interactive buttons and modes
+public class RayMarcher extends JPanel implements MouseMotionListener {
+    // Length and width of the frame
+    private static int frameWidth;
+    private static int frameHeight;
+    // Panel of Buttons for All Different Functionalities
+    private static Panel buttons;
+    // Panel of checkboxes for all different modes
+    private static JPanel combo;
+    // Arraylists for containing objects displayed on the screen
+    private final ArrayList<CollisionObject> OBJECTS;
+    private final ArrayList<CollisionObject> OBJECTS_BLACK;
+    // Camera from which rays shoot
+    private final Camera CAMERA;
+    // Marcher to represent the rays that are shot out
+    private final March MARCHER;
+    // Checkboxes for different modes
+    private JCheckBox multiRay;
+    private JCheckBox spin;
+    private JCheckBox darkMode;
+    // Booleans that start modes based on the state of the checkboxes
+    private boolean multipleRays = false;
+    private boolean isSpinning = false;
+    private boolean isDark = false;
+    // Timer for spin functionality
+    private Timer spinTimer;
+
+    // Constructor that initializes the class
+    public RayMarcher() {
+        // Initialization of all objects
+        this.OBJECTS = new ArrayList<>();
+        this.OBJECTS_BLACK = new ArrayList<>();
+        this.CAMERA = new Camera(300, 300);
+        this.MARCHER = new March();
+        frameHeight = 1000;
+        frameWidth = 1000;
+        // Mouse listener to enable camera movement functionality
+        this.addMouseMotionListener(this);
+        // Calls to various methods to set up buttons
+        setupUIComponents();
+        setupKeyBindings();
+        generateObjects();
+        // Makes user cursor to focus in window
+        setFocusable(true);
+        requestFocusInWindow();
+    }
+
+    public static void main() {
+        JFrame frame = new JFrame("Ray Marching");
+        RayMarcher panel = new RayMarcher();
+        panel.setBackground(Color.black);
+        frame.add(panel, BorderLayout.CENTER);
+
+        frameWidth = 1000;
+        frameHeight = 1000;
+        frame.setSize(frameWidth, frameHeight);
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setVisible(true);
+        frame.setResizable(false);
+        frame.add(buttons, BorderLayout.SOUTH);
+        frame.add(combo, BorderLayout.NORTH);
+    }
+
+    // Method to set up buttons for different functions and modes
+    private void setupUIComponents() {
+        // Initialization of panels that hold buttons and checkboxes
+        buttons = new Panel();
+        buttons.setBackground(new Color(194, 197, 204));
+        combo = new JPanel();
+        combo.setBackground(new Color(194, 197, 204));
+
+        // Multi-ray functionality initialization and actionListener setup
+        multiRay = new JCheckBox("Ray, Ray, Here and There");
+        multiRay.addActionListener(e -> toggleMultiRay());
+
+        // // Add shape functionality initialization and actionListener setup
+        JButton addShape = new JButton("New Friend");
+        addShape.addActionListener(e -> addRandomShape());
+
+        // Remove shape functionality initialization and actionListener setup
+        JButton removeShape = new JButton("Bye Friend");
+        removeShape.addActionListener(e -> removeLastShape());
+
+        // Spinning functionality initialization and actionListener setup
+        spin = new JCheckBox("Merry Go Round");
+        spin.addActionListener(e -> toggleSpin());
+
+        // Reset functionality initialization and actionListener setup
+        JButton reset = new JButton("Back To Start");
+        reset.addActionListener(e -> resetScene());
+
+        // Dark mode functionality initialization and actionListener setup
+        darkMode = new JCheckBox("Echolocation");
+        darkMode.addActionListener(e -> makeDarkMode());
+
+        // Color choosers for the march circles
+        JButton chooseRayCircleColor = new JButton("My March Circles");
+        chooseRayCircleColor.addActionListener(e -> chooseCustomRayCircleColor());
+
+        // Color choosers for the march radii/lines
+        JButton chooseRayLineColor = new JButton("My March Ray");
+        chooseRayLineColor.addActionListener(e -> chooseCustomRayLineColor());
+
+        // Stroke chooser for the march
+        JButton chooseStrokeSize = new JButton("My Ray Width");
+        chooseStrokeSize.addActionListener(e -> chooseCustomStrokeSize());
+
+        // Adding all buttons, checkboxes, and color choosers to respective panels
+        combo.add(multiRay);
+        combo.add(spin);
+        combo.add(darkMode);
+        combo.add(chooseRayCircleColor);
+        combo.add(chooseRayLineColor);
+        combo.add(chooseStrokeSize);
+        buttons.add(addShape);
+        buttons.add(removeShape);
+        buttons.add(reset);
+    }
+
+    // Sets us functionality to allow user to spin camera around using a and left arrow for left, and d and right arrow for right
+    private void setupKeyBindings() {
+        // Creates an actionMap for methodology invocations
+        ActionMap actionMap = getActionMap();
+        // Creates an inputMap object that records user's keystrokes
+        InputMap inputMap = getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+
+        // InputMap addition of the keys that trigger events
+        inputMap.put(KeyStroke.getKeyStroke("LEFT"), "moveLeft");
+        inputMap.put(KeyStroke.getKeyStroke("A"), "moveLeft");
+        inputMap.put(KeyStroke.getKeyStroke("RIGHT"), "moveRight");
+        inputMap.put(KeyStroke.getKeyStroke("D"), "moveRight");
+
+        // Creating  the left move motion to move camera to the left
+        actionMap.put("moveLeft", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                MARCHER.setAngle(MARCHER.getAngle() - Math.toRadians(15));
+                repaint();
+            }
+        });
+
+        // Creating  the right move motion to move camera to the right
+        actionMap.put("moveRight", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                MARCHER.setAngle(MARCHER.getAngle() + Math.toRadians(15));
+                repaint();
+            }
+        });
+    }
+
+    // Initial random objects generator
+    private void generateObjects() {
+        for (int i = 0; i < 20; i++) {
+            addRandomShape();
+        }
+    }
+
+    // Method to add new objects to both arrayLists whenever invoked (Limit is 35)
+    private void addRandomShape() {
+        // Check if too many objects on screen
+        if (OBJECTS.size() >= 35) {
+            JOptionPane.showMessageDialog(null, "No new friends can be made😭😭😭😭😭😭😭😭");
+            return;
+        }
+
+        // Random object creation to ensure proper randomization
+        Random rand = new Random();
+        int next = rand.nextInt(3);
+        // Objects to be added
+        CollisionObject original, blackCopy;
+
+        // If-Else structure to add random objects to their respective arraylists
+        if (next == 0) {
+            original = new CircleObject(rand.nextDouble() * (frameWidth - 50) + 20, rand.nextDouble() * (frameHeight - 50) + 20, rand.nextDouble() * 100 + 40, randomColor());
+            blackCopy = new CircleObject(original.getX(), original.getY(), ((CircleObject) original).getRadius(), Color.BLACK);
+        } else if (next == 1) {
+            original = new RectangleObject(rand.nextDouble() * (frameWidth - 50) + 20, rand.nextDouble() * (frameHeight - 50) + 20, rand.nextDouble() * 100 + 40, rand.nextDouble() * 100 + 40, randomColor());
+            blackCopy = new RectangleObject(original.getX(), original.getY(), ((RectangleObject) original).getWidth(), ((RectangleObject) original).getHeight(), Color.BLACK);
+        } else {
+            original = new TriangleObject(rand.nextDouble() * (frameWidth - 50) + 20, rand.nextDouble() * (frameHeight - 50) + 20, rand.nextDouble() * 100 + 40, randomColor());
+            blackCopy = new TriangleObject(original.getX(), original.getY(), ((TriangleObject) original).getSideLength(), Color.BLACK);
+        }
+
+        // Addition of the objects to respective arrays
+        OBJECTS.add(original);
+        OBJECTS_BLACK.add(blackCopy);
+
+        // Repaints entire screen to have new objects on the screen
+        repaint();
+    }
+
+    // Method to remove the last object in the arrayLists
+    public void removeLastShape() {
+        // Failsafe to ensure minimum of 10 objects in the arrayLists
+        if (OBJECTS.size() <= 10) {
+            JOptionPane.showMessageDialog(null, "Sorry, you can't lose that many friends😭😭😭😭😭😭😭😭");
+            return;
+        }
+        // Removal of the last object in the list
+        OBJECTS.removeLast();
+        OBJECTS_BLACK.removeLast();
+
+        // Repaints the screen to remove objects
+        repaint();
+    }
+
+    // Method to have multiple rays from the camera object
+    private void toggleMultiRay() {
+        // Switch the boolean
+        multipleRays = !multipleRays;
+        // If not multi-ray, then only one ray
+        if (!multipleRays) {
+            MARCHER.march((Graphics2D) getGraphics(), CAMERA.getX(), CAMERA.getY(), 0, OBJECTS);
+        }
+
+        // Repaints the screen to implement modes
+        repaint();
+    }
+
+    // Method to turn whole screen dark
+    private void makeDarkMode() {
+        // Switch the boolean
+        isDark = !isDark;
+
+        // Repaints the screen to implement modes
+        repaint();
+    }
+
+    private void toggleSpin() {
+        isSpinning = spin.isSelected();
+
+        if (isSpinning) {
+            spinTimer = new Timer(30, e -> {
+                MARCHER.setAngle(MARCHER.getAngle() + Math.toRadians(5));
+
+                if (multipleRays) {
+                    double baseAngle = MARCHER.getAngle();
+                    for (int i = 0; i < 360; i += 10) {
+                        double angle = baseAngle + Math.toRadians(i);
+                        MARCHER.march((Graphics2D) getGraphics(), CAMERA.getX(), CAMERA.getY(), angle, OBJECTS);
+                    }
+                } else {
+                    MARCHER.march((Graphics2D) getGraphics(), CAMERA.getX(), CAMERA.getY(), MARCHER.getAngle(), OBJECTS);
+                }
+
+                repaint();
+            });
+            spinTimer.start();
+        } else if (spinTimer != null) {
+            spinTimer.stop();
+        }
+    }
+
+    // Method to help user change their march circle color
+    private void chooseCustomRayCircleColor() {
+        JColorChooser colorChooser = new JColorChooser();
+        colorChooser.setVisible(true); // Show when button is clicked
+        Color selectedColor = JColorChooser.showDialog(null, "Choose a Color", Color.BLACK);
+        if (selectedColor != null) {
+            MARCHER.setCircleColor(selectedColor);
+        }
+        colorChooser.setVisible(false);
+        repaint();
+    }
+
+    // Method to help the user change their march radii/line color
+    private void chooseCustomRayLineColor() {
+        JColorChooser colorChooser = new JColorChooser();
+        colorChooser.setVisible(true); // Show when button is clicked
+        Color selectedColor = JColorChooser.showDialog(null, "Choose a Color", Color.BLACK);
+        if (selectedColor != null) {
+            MARCHER.setLineColor(selectedColor);
+        }
+        colorChooser.setVisible(false);
+        repaint();
+    }
+
+    // Method to help user change brush stroke size
+    private void chooseCustomStrokeSize() {
+        try {
+            String input = JOptionPane.showInputDialog(null, "Enter Ray Stroke Size (1-10):", "Stroke Size", JOptionPane.PLAIN_MESSAGE);
+            if (input != null) {
+                int size = Integer.parseInt(input);
+                if (size >= 1 && size <= 10) {
+                    MARCHER.setStrokeSize(size);
+                    repaint();
+                } else {
+                    JOptionPane.showMessageDialog(null, "Enter a value between 1 and 10.");
+                }
+            }
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(null, "Please enter a valid number.");
+        }
+    }
+
+    // Method to reset entire screen, turns off all modes, and returns both lists to 20 object sizes
+    private void resetScene() {
+        while (OBJECTS.size() > 20) {
+            OBJECTS.removeLast();
+            OBJECTS_BLACK.removeLast();
+        }
+        while (OBJECTS.size() < 20) {
+            addRandomShape();
+        }
+        multipleRays = false;
+        isSpinning = false;
+        multiRay.setSelected(false);
+        spin.setSelected(false);
+        MARCHER.setAngle(0);
+        if (spin.isSelected()) {
+            spin.setSelected(false);
+            if (spinTimer != null) {
+                spinTimer.stop();  // Stop the spin timer
+            }
+        }
+        isDark = false;
+        if (darkMode.isSelected()) darkMode.setSelected(false);
+        MARCHER.setLineColor(Color.BLUE);
+        MARCHER.setCircleColor(new Color(0, 255, 0));
+        repaint();
+    }
+
+    // Paint Component from JFrame which draws all the objects on screen
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g); // Clear the screen
+
+        Graphics2D g2D = (Graphics2D) g;
+        g2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        // Draw OBJECTS
+        for (CollisionObject object : isDark ? OBJECTS_BLACK : OBJECTS) {
+            object.drawObject(g2D);
+        }
+
+        // Draw rays
+        if (multipleRays) {
+            double baseAngle = MARCHER.getAngle();
+            for (int i = 0; i < 360; i += 10) {
+                double angle = baseAngle + Math.toRadians(i);
+                MARCHER.march(g2D, CAMERA.getX(), CAMERA.getY(), angle, OBJECTS);
+            }
+        } else {
+            MARCHER.march(g2D, CAMERA.getX(), CAMERA.getY(), MARCHER.getAngle(), OBJECTS);
+        }
+
+        CAMERA.updateRadius(OBJECTS);
+        CAMERA.drawObject(g2D);
+    }
+
+    // Override method to take in mouse movement to move the camera
+    @Override
+    public void mouseMoved(MouseEvent e) {
+        CAMERA.setPosition(e.getX(), e.getY());
+        repaint();
+    }
+
+    // Override method to take in mouse movement to move the camera
+    @Override
+    public void mouseDragged(MouseEvent e) {
+        CAMERA.setPosition(e.getX(), e.getY());
+        repaint();
+    }
+
+    // Method to create a random color
+    private Color randomColor() {
+        return new Color((int) (Math.random() * 256), (int) (Math.random() * 256), (int) (Math.random() * 256));
+    }
+}
+
+// Mach class that creates the march of the ray across the screen
+class March {
+    // Variables of the March cLASS
+    private final Ellipse2D.Double CIRCLE;
+    private final Line2D.Double LINE;
+    private double angle;
+    private Color lineColor, circleColor;
+    private int strokeSize;
+
+    // Constructor to create new march object
+    public March() {
+        this.CIRCLE = new Ellipse2D.Double();
+        this.LINE = new Line2D.Double();
+        circleColor = new Color(0, 255, 0);
+        lineColor = Color.BLUE;
+        strokeSize = 10;
+    }
+
+    // Method that creates the march of the ray across the screen
+    public void march(Graphics2D g2D, double startX, double startY, double angle, ArrayList<CollisionObject> objects) {
+        double x = startX;
+        double y = startY;
+        this.angle = angle;
+        while (true) {
+            double minDistance = Double.MAX_VALUE;
+            for (CollisionObject obj : objects) {
+                double distance = obj.computeDistance(x, y);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                }
+                if (obj.contains(new Camera(startX, startY))) {
+                    minDistance = 0;
+                }
+            }
+
+            if (minDistance < 0.01 || x < 0 || y < 0 || x > 1050 || y > 1050) {
+                break;
+            }
+
+            CIRCLE.setFrame(x - minDistance, y - minDistance, minDistance * 2, minDistance * 2);
+            LINE.setLine(startX, startY, x, y);
+
+            g2D.setColor(lineColor);
+            g2D.draw(LINE);
+            g2D.setColor(circleColor);
+            g2D.setStroke(new BasicStroke(strokeSize));
+            g2D.draw(CIRCLE);
+
+            x += Math.cos(angle) * minDistance;
+            y += Math.sin(angle) * minDistance;
+        }
+    }
+
+    // Getter of angle variable
+    public double getAngle() {
+        return angle;
+    }
+
+    // Setter of the angle variable
+    public void setAngle(double angle) {
+        this.angle = angle;
+    }
+
+    // Setters to set variables of the march class
+    public void setCircleColor(Color circleColor) {
+        this.circleColor = circleColor;
+    }
+
+    public void setLineColor(Color lineColor) {
+        this.lineColor = lineColor;
+    }
+
+    public void setStrokeSize(int strokeSize) {
+        this.strokeSize = strokeSize;
+    }
+}
+
+// Parent class that is template for child class shapes
+abstract class CollisionObject implements Drawable {
+    // Method
+    protected double x, y;
+    protected Color color;
+
+    // Constructor to be used by subclasses
+    public CollisionObject(double x, double y, Color color) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+    }
+
+    // Abstract method, to be implemented in subclasses
+    public abstract double computeDistance(double px, double py);
+
+    // Abstract method, to be implemented in subclasses
+    public abstract boolean contains(Camera c);
+
+    // Getters for the variables
+    public double getX() {
+        return x;
+    }
+
+    public double getY() {
+        return y;
+    }
+}
+
+// Class that represents the circle object
+class CircleObject extends CollisionObject {
+    // Object variables
+    private final double radius;
+
+    // Constructor to create the object
+    public CircleObject(double x, double y, double radius, Color color) {
+        super(x, y, color);
+        this.radius = radius;
+    }
+
+    // Method to calculate distance between the object and the camera
+    @Override
+    public double computeDistance(double px, double py) {
+        return Math.hypot(px - x, py - y) - radius;
+    }
+
+    // Method to check if the camera is in the object
+    @Override
+    public boolean contains(Camera c) {
+        double distance = Math.hypot(c.getX() - this.x, c.getY() - this.y);
+        return distance <= radius;
+    }
+
+    // Method to draw the object
+    @Override
+    public void drawObject(Graphics2D g2D) {
+        g2D.setColor(color);
+        g2D.fill(new Ellipse2D.Double(x - radius, y - radius, radius * 2, radius * 2));
+    }
+
+    // Getters for the variables
+    public double getRadius() {
+        return radius;
+    }
+}
+
+// Class that represents a rectangle object
+class RectangleObject extends CollisionObject {
+    // Variables of the object
+    private final double width;
+    private final double height;
+
+    // Constructor to create the object
+    public RectangleObject(double x, double y, double width, double height, Color color) {
+        super(x, y, color);
+        this.width = width;
+        this.height = height;
+    }
+
+    // Method to calculate the distance between the object and the camera
+    @Override
+    public double computeDistance(double px, double py) {
+        double dx = Math.max(Math.abs(px - x) - width / 2.0, 0);
+        double dy = Math.max(Math.abs(py - y) - height / 2.0, 0);
+        return Math.hypot(dx, dy);
+    }
+
+    // Method to check if the camera is in the object
+    @Override
+    public boolean contains(Camera c) {
+        double halfWidth = this.width / 2.0;
+        double halfHeight = this.height / 2.0;
+        return (c.getX() >= (this.x - halfWidth) && c.getX() <= (this.x + halfWidth) && c.getY() >= (this.y - halfHeight) && c.getY() <= (this.y + halfHeight));
+    }
+
+    // Method to draw the object
+    @Override
+    public void drawObject(Graphics2D g2D) {
+        g2D.setColor(color);
+        g2D.fill(new Rectangle2D.Double(x - width / 2.0, y - height / 2.0, width, height));
+    }
+
+    //  Getters for variables
+    public double getHeight() {
+        return height;
+    }
+
+    public double getWidth() {
+        return width;
+    }
+}
+
+// Triangle class to create a Triangle Object
+class TriangleObject extends CollisionObject {
+    private static final double EPSILON = 1e-6;
+    private final double[] xPoints;
+    private final double[] yPoints;
+    private final double sideLength;
+
+    // Constructor to  create Triangle Object
+    public TriangleObject(double x, double y, double sideLength, Color color) {
+        super(x, y, color);
+
+        this.sideLength = sideLength;
+
+        this.xPoints = new double[3];
+        this.yPoints = new double[3];
+
+        // Equilateral triangle geometry
+        double height = Math.sqrt(3) / 2 * sideLength;
+        xPoints[0] = x;
+        yPoints[0] = y - height / 2;
+
+        xPoints[1] = x - sideLength / 2;
+        yPoints[1] = y + height / 2;
+
+        xPoints[2] = x + sideLength / 2;
+        yPoints[2] = y + height / 2;
+    }
+
+    // Method to compute the distance between the camera and the triangle
+    @Override
+    public double computeDistance(double px, double py) {
+        double minDist = Double.MAX_VALUE;
+
+        for (int i = 0; i < 3; i++) {
+            int next = (i + 1) % 3;
+            double dist = new Line2D.Double(xPoints[i], yPoints[i], xPoints[next], yPoints[next]).ptSegDist(px, py);
+            minDist = Math.min(minDist, dist);
+        }
+
+        return minDist;
+    }
+
+    // Method to check if the object is within the triangle
+    @Override
+    public boolean contains(Camera c) {
+        double x1 = xPoints[0], y1 = yPoints[0];
+        double x2 = xPoints[1], y2 = yPoints[1];
+        double x3 = xPoints[2], y3 = yPoints[2];
+
+        double areaOrig = Math.abs(x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2));
+        double area1 = Math.abs(c.getX() * (y2 - y3) + x2 * (y3 - c.getY()) + x3 * (c.getY() - y2));
+        double area2 = Math.abs(x1 * (c.getY() - y3) + c.getX() * (y3 - y1) + x3 * (y1 - c.getY()));
+        double area3 = Math.abs(x1 * (y2 - c.getY()) + x2 * (c.getY() - y1) + c.getX() * (y1 - y2));
+
+        // Allow a small tolerance due to floating-point precision issues
+        return Math.abs((area1 + area2 + area3) - areaOrig) < EPSILON;
+    }
+
+    // Method to draw the object
+    @Override
+    public void drawObject(Graphics2D g2D) {
+        g2D.setColor(color);
+        int[] xInt = {(int) xPoints[0], (int) xPoints[1], (int) xPoints[2]};
+        int[] yInt = {(int) yPoints[0], (int) yPoints[1], (int) yPoints[2]};
+        g2D.fillPolygon(xInt, yInt, 3);
+    }
+
+    // Getter for the sideLength
+    public double getSideLength() {
+        return sideLength;
+    }
+}
+
+class Camera implements Drawable {
+    // Variables of the camera
+    private double x, y;
+    private double radius;
+
+    // Constructor to create the camera
+    public Camera(double x, double y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 50;
+    }
+
+    // method to set the position of the camera
+    public void setPosition(double x, double y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    // method to update the radius of the camera in account for the nearest object
+    public void updateRadius(ArrayList<CollisionObject> objects) {
+        double minDistance = Double.MAX_VALUE;
+        for (CollisionObject obj : objects) {
+            double distance = obj.computeDistance(x, y);
+            if (distance < minDistance) {
+                minDistance = distance;
+            }
+        }
+        this.radius = Math.max(minDistance, 10);
+    }
+
+    // Method to draw the object on the screen
+    @Override
+    public void drawObject(Graphics2D g2D) {
+        g2D.setColor(Color.RED);
+        g2D.fill(new Ellipse2D.Double(x - 5, y - 5, 10, 10));
+        g2D.setColor(new Color(255, 0, 0, 100));
+        g2D.draw(new Ellipse2D.Double(x - radius, y - radius, radius * 2, radius * 2));
+    }
+
+    // Getters to get x and y coordinates
+    public double getX() {
+        return x;
+    }
+
+    public double getY() {
+        return y;
+    }
+}
