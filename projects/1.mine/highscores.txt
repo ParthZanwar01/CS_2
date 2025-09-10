@@ -1,0 +1,20 @@
+Bryce Hulett
+5
+Kruskal
+8
+Dijkstra
+8
+Noah Hulett
+9
+Bryce Hulett
+10
+Again?
+10
+NO!
+10
+A*
+10
+Turing
+10
+Damon Hulett
+11

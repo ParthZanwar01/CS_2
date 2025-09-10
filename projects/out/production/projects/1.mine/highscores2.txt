@@ -1,0 +1,20 @@
+Beat Me
+44
+delete
+51
+not fast enough
+56
+Turing
+59
+too slow
+61
+Noah Hulett
+69
+Dijkstra
+69
+Bryce Hulett
+81
+A*
+88
+micah
+90

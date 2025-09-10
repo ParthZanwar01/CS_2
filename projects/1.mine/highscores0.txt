@@ -1,0 +1,20 @@
+what??
+3
+Bryce Hulett
+5
+A*
+7
+micah
+7
+Kruskal
+8
+Dijkstra
+8
+ok
+8
+turing
+8
+Noah Hulett
+9
+too slow
+9
